@@ -1,6 +1,5 @@
-export const STORAGE_KEY = "openbase.agent.db.v1";
-export const FILE_NAME = "agent.db";
-export const PROTOCOL = "2026-07-28";
+export const STORAGE_KEY = "agentdb.browser-demo.v1";
+export const FILE_NAME = "localStorage snapshot";
 export const ENGINE_VERSION = "0.4.0";
 
 export type Role = "read" | "write" | "admin";
@@ -65,6 +64,22 @@ export type CdcEvent = {
 
 export type WalRec = { lsn: number; sql: string; ts: number };
 
+export type EvidenceReceipt = {
+  receiptId: number;
+  runId: string;
+  sessionId: string;
+  actorChain: string[];
+  intent: string;
+  decision: { approved: boolean; policy: string; latencyMs: number };
+  action: string;
+  resultHash: string;
+  resultSummary: string;
+  prevHash: string;
+  timestamp: string;
+  audienceExplanation: string;
+  hash: string;
+};
+
 export type DataState = {
   tables: { name: string; cols: Col[]; rows: Row[]; nextId: number }[];
   indexes: IndexDef[];
@@ -85,6 +100,7 @@ export type Snapshot = {
   patterns: [string, string][];
   checkpoint: DataState;
   wal: WalRec[];
+  evidence?: EvidenceReceipt[];
 };
 
 export type PlanStep = { op: string; detail: string; rows: number };

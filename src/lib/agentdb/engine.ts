@@ -1,8 +1,9 @@
 import { Bm25Index } from "./bm25.ts";
+import { appendReceipt, verifyChain, type EvidenceInput } from "./evidence.ts";
 import { HnswIndex } from "./hnsw.ts";
 import { mutates, parseSql, type Expr, type Stmt } from "./parse.ts";
 import { DIM, distance, embedText, likeMatch, similarity, sqlQuote } from "./text.ts";
-import { DbError, STORAGE_KEY, type CdcEvent, type Col, type DataState, type ExecResult, type IndexDef, type Memory, type Metric, type PlanStep, type Role, type Row, type Snapshot, type StreamDef, type Val } from "./types.ts";
+import { DbError, STORAGE_KEY, type CdcEvent, type Col, type DataState, type EvidenceReceipt, type ExecResult, type IndexDef, type Memory, type Metric, type PlanStep, type Role, type Row, type Snapshot, type StreamDef, type Val } from "./types.ts";
 
 type Table = { name: string; cols: Col[]; rows: Row[]; nextId: number };
 type Env = { by: Record<string, Record<string, Val>>; id: number; table: string };
@@ -35,6 +36,7 @@ export class Engine {
   private patterns = new Map<string, string>();
   private cache = new Map<string, ExecResult>();
   private bmCache = new Map<string, Map<number, number>>();
+  private evidence: EvidenceReceipt[] = [];
 
   static seed(sqls: string[]): Engine {
     const engine = new Engine();
@@ -57,6 +59,7 @@ export class Engine {
     engine.session = snap.session;
     engine.stats = { ...snap.stats };
     engine.patterns = new Map(snap.patterns);
+    engine.evidence = (snap.evidence ?? []).map((receipt) => ({ ...receipt, actorChain: [...receipt.actorChain], decision: { ...receipt.decision } }));
     for (const rec of snap.wal) {
       const result = engine.exec(rec.sql, true);
       if (!result.ok) throw new DbError(`WAL replay failed at LSN ${rec.lsn}: ${result.error}`);
@@ -84,7 +87,26 @@ export class Engine {
       patterns: [...this.patterns.entries()],
       checkpoint: this.base,
       wal: this.wal.map((rec) => ({ ...rec })),
+      evidence: this.evidence.map((receipt) => ({ ...receipt, actorChain: [...receipt.actorChain], decision: { ...receipt.decision } })),
     };
+  }
+
+  appendEvidence(input: EvidenceInput): EvidenceReceipt {
+    const receipt = appendReceipt(this.evidence, input);
+    this.persist();
+    return { ...receipt, actorChain: [...receipt.actorChain], decision: { ...receipt.decision } };
+  }
+
+  evidenceRows(): EvidenceReceipt[] {
+    return this.evidence.map((receipt) => ({ ...receipt, actorChain: [...receipt.actorChain], decision: { ...receipt.decision } }));
+  }
+
+  verifyEvidence(): { ok: boolean; count: number; error?: string } {
+    return verifyChain(this.evidence);
+  }
+
+  evidenceSchema(): string {
+    return "CREATE TABLE evidence_ledger (receipt_id INTEGER PRIMARY KEY, run_id TEXT NOT NULL, session_id TEXT NOT NULL, actor_chain TEXT NOT NULL, intent TEXT NOT NULL, decision TEXT NOT NULL, action TEXT NOT NULL, result_hash TEXT NOT NULL, result_summary TEXT, prev_hash TEXT NOT NULL, timestamp TEXT NOT NULL, audience_explanation TEXT, receipt_hash TEXT NOT NULL)";
   }
 
   setRole(role: Role): void {
@@ -195,6 +217,7 @@ export class Engine {
   counts(): Record<string, number> {
     const out: Record<string, number> = {};
     for (const table of this.tables.values()) out[table.name] = table.rows.length;
+    out.evidence_ledger = this.evidence.length;
     out["memory"] = this.memories.length;
     return out;
   }
@@ -212,6 +235,15 @@ export class Engine {
       cols: table.cols,
       sample: table.rows.slice(0, 5).map((row) => hideVectors(table, row.data)),
     }));
+    const evidenceTable = this.evidenceTable();
+    tables.push({
+      name: evidenceTable.name,
+      columns: evidenceTable.cols.length,
+      rows: evidenceTable.rows.length,
+      ddl: this.evidenceSchema(),
+      cols: evidenceTable.cols,
+      sample: evidenceTable.rows.slice(0, 5).map((row) => ({ ...row.data })),
+    });
     const indexes = [...this.indexes.values()].map((idx) => ({
       name: idx.def.name,
       table: idx.def.table,
@@ -226,7 +258,7 @@ export class Engine {
             : `${idx.entries.length} keys`,
     }));
     return {
-      file: "agent.db",
+      file: "localStorage snapshot",
       lsn: this.lsn,
       checkpointLsn: this.checkpointLsn,
       wal: this.wal.length,
@@ -356,6 +388,7 @@ export class Engine {
 
   private createTable(stmt: Extract<Stmt, { k: "create_table" }>): ExecResult {
     this.need("write");
+    if (stmt.name === "evidence_ledger") throw new DbError("evidence_ledger is a reserved append-only system table");
     if (this.tables.has(stmt.name)) {
       if (stmt.ifNot) return blank(`table ${stmt.name} exists`);
       throw new DbError(`table ${stmt.name} already exists`);
@@ -373,6 +406,7 @@ export class Engine {
 
   private createIndex(stmt: Extract<Stmt, { k: "create_index" }>): ExecResult {
     this.need("write");
+    if (stmt.table === "evidence_ledger") throw new DbError("evidence_ledger does not support user-defined indexes");
     const table = this.requireTable(stmt.table);
     if (this.indexes.has(stmt.name)) {
       if (stmt.ifNot) return blank(`index ${stmt.name} exists`);
@@ -405,6 +439,7 @@ export class Engine {
   private drop(stmt: Extract<Stmt, { k: "drop" }>): ExecResult {
     this.need("admin");
     if (stmt.kind === "table") {
+      if (stmt.name === "evidence_ledger") throw new DbError("evidence_ledger is append-only and cannot be dropped");
       if (!this.tables.has(stmt.name)) {
         if (stmt.ifExists) return blank("nothing to drop");
         throw new DbError(`no table ${stmt.name}`);
@@ -432,6 +467,7 @@ export class Engine {
 
   private insert(stmt: Extract<Stmt, { k: "insert" }>): ExecResult {
     this.need("write");
+    if (stmt.table === "evidence_ledger") throw new DbError("use the evidence append API; evidence_ledger is append-only");
     const table = this.requireTable(stmt.table);
     const cols = stmt.cols ?? table.cols.map((col) => col.name);
     let n = 0;
@@ -463,6 +499,7 @@ export class Engine {
 
   private update(stmt: Extract<Stmt, { k: "update" }>): ExecResult {
     this.need("write");
+    if (stmt.table === "evidence_ledger") throw new DbError("evidence_ledger is append-only");
     const table = this.requireTable(stmt.table);
     const pk = table.cols.find((col) => col.primary);
     let n = 0;
@@ -485,6 +522,7 @@ export class Engine {
 
   private delete(stmt: Extract<Stmt, { k: "delete" }>): ExecResult {
     this.need("write");
+    if (stmt.table === "evidence_ledger") throw new DbError("evidence_ledger is append-only");
     const table = this.requireTable(stmt.table);
     const keep: Row[] = [];
     let n = 0;
@@ -761,11 +799,12 @@ export class Engine {
   private show(stmt: Extract<Stmt, { k: "show" }>): ExecResult {
     if (stmt.what === "tables") {
       const tables = [...this.tables.values()];
+      const evidence = this.evidenceTable();
       return {
         ...blank(""),
         columns: [{ name: "name" }, { name: "columns" }, { name: "rows" }],
-        rows: tables.map((table) => [table.name, table.cols.length, table.rows.length]),
-        plan: [{ op: "catalog", detail: "tables", rows: tables.length }],
+        rows: [...tables.map((table) => [table.name, table.cols.length, table.rows.length]), [evidence.name, evidence.cols.length, evidence.rows.length]],
+        plan: [{ op: "catalog", detail: "tables", rows: tables.length + 1 }],
       };
     }
     if (stmt.what === "indexes") {
@@ -792,6 +831,14 @@ export class Engine {
         columns: [{ name: "id" }, { name: "stream" }, { name: "op" }, { name: "table" }, { name: "summary" }],
         rows: events.map((event) => [event.id, event.stream, event.op, event.table, eventSummary(event)]),
         plan: [{ op: "cdc", detail: "recent", rows: events.length }],
+      };
+    }
+    if (stmt.name === "evidence_ledger") {
+      return {
+        ...blank(""),
+        columns: [{ name: "ddl" }],
+        rows: [[this.evidenceSchema()]],
+        plan: [{ op: "catalog", detail: "evidence_ledger", rows: 1 }],
       };
     }
     const table = this.requireTable(stmt.name ?? "");
@@ -1203,9 +1250,38 @@ export class Engine {
   }
 
   private requireTable(name: string): Table {
+    if (name === "evidence_ledger") return this.evidenceTable();
     const table = this.tables.get(name);
     if (!table) throw new DbError(`no table ${name}`);
     return table;
+  }
+
+  private evidenceTable(): Table {
+    const cols: Col[] = [
+      ["receipt_id", "INTEGER", true], ["run_id", "TEXT", false], ["session_id", "TEXT", false],
+      ["actor_chain", "TEXT", false], ["intent", "TEXT", false], ["decision", "TEXT", false],
+      ["action", "TEXT", false], ["result_hash", "TEXT", false], ["result_summary", "TEXT", false],
+      ["prev_hash", "TEXT", false], ["timestamp", "TEXT", false], ["audience_explanation", "TEXT", false], ["receipt_hash", "TEXT", false],
+    ].map(([name, type, primary]) => ({ name: name as string, type: type as Col["type"], primary: Boolean(primary), notNull: true }));
+    const rows: Row[] = this.evidence.map((receipt) => ({
+      __id: receipt.receiptId,
+      data: {
+        receipt_id: receipt.receiptId,
+        run_id: receipt.runId,
+        session_id: receipt.sessionId,
+        actor_chain: JSON.stringify(receipt.actorChain),
+        intent: receipt.intent,
+        decision: JSON.stringify(receipt.decision),
+        action: receipt.action,
+        result_hash: receipt.resultHash,
+        result_summary: receipt.resultSummary,
+        prev_hash: receipt.prevHash,
+        timestamp: receipt.timestamp,
+        audience_explanation: receipt.audienceExplanation,
+        receipt_hash: receipt.hash,
+      },
+    }));
+    return { name: "evidence_ledger", cols, rows, nextId: rows.length + 1 };
   }
 
   private need(role: Role): void {

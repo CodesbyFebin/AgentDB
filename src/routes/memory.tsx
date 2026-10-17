@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Shell } from "@/components/openbase/shell";
-import { Btn, Field, Panel, fieldClass } from "@/components/openbase/ui";
-import { getEngine, runSql, setSession, useConsole } from "@/lib/openbase/store";
-import { sqlQuote } from "@/lib/openbase/text";
+import { Shell } from "@/components/agentdb/shell";
+import { Btn, Field, Panel, fieldClass } from "@/components/agentdb/ui";
+import { getEngine, runSql, setSession, useConsole } from "@/lib/agentdb/store";
+import { sqlQuote } from "@/lib/agentdb/text";
 
 export const Route = createFileRoute("/memory")({ component: Page });
 

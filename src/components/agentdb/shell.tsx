@@ -1,8 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Activity, Brain, Cable, Gauge, Search, TableProperties, Terminal, Waypoints } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
-import { boot, getEngine, setRole, useConsole } from "@/lib/openbase/store";
-import type { Role } from "@/lib/openbase/types";
+import { boot, getEngine, setRole, useConsole } from "@/lib/agentdb/store";
+import type { Role } from "@/lib/agentdb/types";
 
 const NAV = [
   { to: "/", label: "SQL", icon: Terminal },
@@ -31,8 +31,8 @@ export function Shell({ children }: { children: ReactNode }) {
         <Link to="/" className="flex items-center gap-3">
           <Mark />
           <span>
-            <span className="block font-mono text-sm font-medium tracking-widest">OPENBASE</span>
-            <span className="block text-xs text-muted">The agent is the primary user</span>
+            <span className="block font-mono text-sm font-medium tracking-widest">AGENTDB</span>
+            <span className="block text-xs text-muted">Browser prototype · Phase 0</span>
           </span>
         </Link>
         <RoleSwitch role={view?.role ?? "admin"} disabled={!ready} />
@@ -60,11 +60,11 @@ export function Shell({ children }: { children: ReactNode }) {
           ) : null}
           <main className="px-4 py-4 md:px-6 md:py-6">{children}</main>
           <footer className="flex flex-wrap gap-x-3 gap-y-1 px-4 pb-6 font-mono text-xs text-muted md:px-6">
-            <span>{ready ? "agent.db" : "opening agent.db"}</span>
+            <span>{ready ? "localStorage snapshot" : "opening browser snapshot"}</span>
             <span className="tabular-nums">LSN {String(view?.lsn ?? 0).padStart(4, "0")}</span>
             <span className="tabular-nums">WAL {view?.wal ?? 0}</span>
-            <span>MCP 2026-07-28</span>
-            <span>snapshot · no network</span>
+            <span>34 in-browser tool calls</span>
+            <span>localStorage · no database transport</span>
             {view ? <span className="tabular-nums">{(view.bytes / 1024).toFixed(1)} kb</span> : null}
           </footer>
         </div>

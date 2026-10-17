@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ResultGrid } from "@/components/openbase/grid";
-import { Shell } from "@/components/openbase/shell";
-import { Btn, fieldClass } from "@/components/openbase/ui";
-import { nlToSql, type NlNeed } from "@/lib/openbase/nl2sql";
-import { SAMPLES } from "@/lib/openbase/seed";
-import { getEngine, runSql, useConsole } from "@/lib/openbase/store";
+import { ResultGrid } from "@/components/agentdb/grid";
+import { Shell } from "@/components/agentdb/shell";
+import { Btn, fieldClass } from "@/components/agentdb/ui";
+import { nlToSql, type NlNeed } from "@/lib/agentdb/nl2sql";
+import { SAMPLES } from "@/lib/agentdb/seed";
+import { getEngine, runSql, useConsole } from "@/lib/agentdb/store";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -68,7 +68,7 @@ function Workbench() {
         <div>
           <h1 className="text-lg font-medium">Workbench</h1>
           <p className="max-w-xl text-sm text-pretty text-muted">
-            One file. SQL, exact vector order, BM25, and hybrid fusion share this process. Nothing leaves the browser.
+            Browser-based demo. SQL-like queries, exact vector search, BM25, and hybrid ranking run in this page; data is saved in this browser profile.
           </p>
         </div>
         <div className="flex rounded-md border border-line p-1" role="group" aria-label="Editor mode">

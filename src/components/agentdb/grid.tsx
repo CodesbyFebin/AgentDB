@@ -1,4 +1,4 @@
-import type { ExecResult } from "@/lib/openbase/types";
+import type { ExecResult } from "@/lib/agentdb/types";
 import { formatCell } from "./ui";
 
 export function ResultGrid({ result }: { result: ExecResult | null }) {

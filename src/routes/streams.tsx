@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Shell } from "@/components/openbase/shell";
-import { Btn, Field, Panel, fieldClass } from "@/components/openbase/ui";
-import { getEngine, runSql, useConsole } from "@/lib/openbase/store";
+import { Shell } from "@/components/agentdb/shell";
+import { Btn, Field, Panel, fieldClass } from "@/components/agentdb/ui";
+import { getEngine, runSql, useConsole } from "@/lib/agentdb/store";
 
 export const Route = createFileRoute("/streams")({ component: Page });
 

@@ -3,16 +3,17 @@ import { describe, it } from "node:test";
 import { Engine } from "./engine.ts";
 import { HnswIndex } from "./hnsw.ts";
 import { callTool, discover, TOOLS } from "./mcp.ts";
+import { sha256 } from "./evidence.ts";
 import { nlToSql } from "./nl2sql.ts";
 import { openSeed } from "./seed.ts";
 import { distance } from "./text.ts";
 
-describe("openbase engine", () => {
+describe("agentdb browser prototype", () => {
   it("seeds, filters, groups, joins, and reads JSON", () => {
     const db = openSeed();
     const tables = db.exec("SHOW TABLES");
     assert.equal(tables.ok, true);
-    assert.equal(tables.rows.length, 2);
+    assert.equal(tables.rows.length, 3);
 
     const protocol = db.exec("SELECT id, title FROM docs WHERE category = 'protocol'");
     assert.equal(protocol.ok, true);
@@ -39,7 +40,7 @@ describe("openbase engine", () => {
   it("ranks the write-ahead log by vector distance and BM25", () => {
     const db = openSeed();
     const nearest = db.exec(
-      "SELECT id, title FROM docs ORDER BY vector_distance(embedding, embed('The write-ahead log records every committed mutation before the checkpoint is rewritten. After a crash, OpenBase replays the log from the last checkpoint so committed writes survive.')) LIMIT 1",
+      "SELECT id, title FROM docs ORDER BY vector_distance(embedding, embed('The write-ahead log records every committed mutation before the checkpoint is rewritten. After a crash, AgentDB replays the log from the last checkpoint so committed writes survive.')) LIMIT 1",
     );
     assert.equal(nearest.ok, true, nearest.error);
     assert.equal(nearest.rows[0][0], 3);
@@ -87,12 +88,13 @@ describe("openbase engine", () => {
     assert.equal(db.exec("SELECT count(*) AS n FROM sources").rows[0][0], 5);
   });
 
-  it("speaks MCP, including a clarifying round trip", () => {
+  it("exposes the in-browser tool registry and clarification flow", () => {
     const db = openSeed();
     const info = discover(db);
-    assert.equal(info.protocol, "2026-07-28");
-    assert.equal(info.stateless, true);
-    assert.ok(TOOLS.length >= 30);
+    assert.equal(info.protocol, null);
+    assert.equal(info.transport, "in-browser-demo");
+    assert.equal(info.stateless, false);
+    assert.equal(TOOLS.length, 44);
 
     const listed = callTool(db, "list_tables", {});
     assert.equal(listed.ok, true);
@@ -107,6 +109,34 @@ describe("openbase engine", () => {
       assert.equal(ran.ok, true, ran.error);
       assert.ok(ran.rows.length > 0);
     }
+  });
+});
+
+describe("evidence ledger", () => {
+  it("appends tool receipts and verifies a ten-entry SHA-256 chain", () => {
+    const db = openSeed();
+    assert.equal(sha256("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    for (let i = 0; i < 10; i++) {
+      const result = callTool(db, "list_tables", { run_id: "ledger-test" });
+      assert.equal(result.ok, true);
+    }
+    assert.equal(db.evidenceRows().length, 10);
+    assert.deepEqual(db.verifyEvidence(), { ok: true, count: 10 });
+    const query = db.exec("SELECT receipt_id, run_id FROM evidence_ledger WHERE run_id = 'ledger-test'");
+    assert.equal(query.ok, true, query.error);
+    assert.equal(query.rows.length, 10);
+  });
+
+  it("detects a modified receipt after snapshot reload", () => {
+    const db = openSeed();
+    for (let i = 0; i < 10; i++) callTool(db, "list_tables", { run_id: "tamper-test" });
+    const snap = db.toSnapshot();
+    assert.ok(snap.evidence);
+    snap.evidence[4].resultSummary = "tampered receipt";
+    const tampered = Engine.load(snap);
+    const verified = tampered.verifyEvidence();
+    assert.equal(verified.ok, false);
+    assert.match(verified.error ?? "", /hash mismatch/);
   });
 });
 

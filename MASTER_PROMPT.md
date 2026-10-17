@@ -363,8 +363,10 @@ is a runtime error (AD-601).
 | 44 | Agent | `agent_tools_list` | List available tools with descriptions and role requirements | read |
 
 [COUNT: Phase 0 has 34 in-browser, MCP-shaped tool calls. Phase 1 targets 44
-MCP tools, a net increase of 10. The final Phase 1 tool delta must be listed
-by name after reconciling which Phase 0 calls become protocol tools.]
+tools: retire the `query_plan` alias, rename `table_stats` to `stats`, and add
+`execute_query`, `import_csv`, `create_stream`, `stream_read`, `drop_stream`,
+`checkpoint`, plus the five `evidence_*` tools. This is 11 additions and one
+retired alias, for a net increase of 10.]
 
 ### 7.3 MCP Resources
 | URI | Content |
@@ -415,6 +417,7 @@ CREATE TABLE evidence_ledger (
   result_hash    TEXT NOT NULL,          -- SHA-256 of the result
   result_summary TEXT,                   -- Short human-readable summary
   prev_hash      TEXT NOT NULL,          -- SHA-256 of previous receipt (chain)
+  receipt_hash   TEXT NOT NULL,          -- SHA-256 of this receipt's full row
   timestamp      TEXT NOT NULL,          -- ISO 8601 UTC
   audience_explanation TEXT              -- Plain-English (D10)
 );
@@ -587,13 +590,20 @@ agentdb lift app.py --schema mydata.db    # Ingress pipeline [Phase 3]
 | Phase 0 | 34 | Browser prototype calls |
 | Phase 1 | 44 | Target MCP tool surface |
 
+**Current status:** The browser prototype now exposes the 44-name target
+registry and an initial append-only, SHA-256 hash-chained evidence ledger.
+These remain in-browser function calls. Real MCP transport, stateless request
+resumption, policy evaluation, and production audit explanations remain open.
+
 **Entry criterion:** Phase 0 console working.
 **Exit criterion:** The 30-second demo (Section 9.1) works end-to-end.
 An MCP client connects, discovers, searches, remembers, recalls, and gets
 a plain-English explanation. No human touches the SQL console.
 
 **Scope:**
-1. `evidence_ledger` table + 5 evidence MCP tools (total: 44).
+1. Complete the 44-tool target surface: the 5 evidence tools and the six other
+   additions listed in the count note above. The browser prototype currently
+   implements them without MCP transport.
 2. Per-action intent evaluation (rule-based policy engine) replacing
    coarse RBAC as the primary authorization mechanism.
 3. Routing headers (`Mcp-Method`, `Mcp-Name`) on HTTP transport.

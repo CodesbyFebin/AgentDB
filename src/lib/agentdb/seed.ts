@@ -5,26 +5,26 @@ type Doc = { title: string; body: string; category: string; topic: string };
 
 const DOCS: Doc[] = [
   {
-    title: "Stateless MCP",
-    body: "The 2026-07-28 MCP specification makes the server stateless. Every request carries _meta with the protocol version and client capabilities. server/discover returns supported versions. There is no initialize handshake and no Mcp-Session-Id.",
+    title: "MCP transport roadmap",
+    body: "The current browser demo has no MCP transport. It previews tool-shaped calls in TypeScript. A future server implementation must be tested against the selected MCP specification before claiming conformance.",
     category: "protocol",
     topic: "mcp",
   },
   {
     title: "Multi round-trip requests",
-    body: "MRTR lets the server return InputRequiredResult when an agent must clarify an ambiguous table name or a missing argument before the tool can run.",
+    body: "This browser preview can pause a tool-shaped call and ask the user to choose a table. That UI behavior does not implement the MCP MRTR protocol.",
     category: "protocol",
     topic: "mrtr",
   },
   {
     title: "Write-ahead log crash recovery",
-    body: "The write-ahead log records every committed mutation before the checkpoint is rewritten. After a crash, OpenBase replays the log from the last checkpoint so committed writes survive.",
+    body: "The browser prototype records mutations in a simulated operation log and can replay it from a JSON snapshot. This is not a crash-durable write-ahead log.",
     category: "storage",
     topic: "wal",
   },
   {
-    title: "Single file storage",
-    body: "The primary store is one file. No server, no Docker, and no cloud bucket is required to open it. Optional object storage is a backend trait and stays off unless you ask.",
+    title: "Browser-local snapshot",
+    body: "The prototype serializes its demo state to localStorage in the current browser profile. It does not create or open an operating-system database file.",
     category: "storage",
     topic: "file",
   },
@@ -54,7 +54,7 @@ const DOCS: Doc[] = [
   },
   {
     title: "Agent memory decay",
-    body: "memory_store keeps a key, a value, an embedding, metadata, a ttl, and an importance score. memory_recall ranks episodic notes by similarity times exponential decay. Memory survives a restart of the file.",
+    body: "The demo memory calls keep a key, value, embedding, metadata, ttl, and importance score. Recall ranks notes by similarity and decay. Data persists through browser reloads in the same profile.",
     category: "agent",
     topic: "decay",
   },
@@ -78,7 +78,7 @@ const DOCS: Doc[] = [
   },
   {
     title: "Query sandbox",
-    body: "Each MCP tool is gated by role. A read-only session cannot insert. Admin is required to drop a table, vacuum, or rebuild indexes. Result sets are capped.",
+    body: "The demo engine applies read, write, and admin role checks in client-side state. These checks are useful for trying the UI, but they are not an authorization boundary.",
     category: "security",
     topic: "sandbox",
   },
@@ -95,15 +95,15 @@ const DOCS: Doc[] = [
     topic: "json",
   },
   {
-    title: "Offline and no phone home",
-    body: "OpenBase does not embed telemetry, a license server, or a network call. Every query in this console runs on the local file. The intended license is Apache-2.0.",
+    title: "Browser-side execution",
+    body: "The query engine runs in the browser and does not send query data to a database service. The UI may load external fonts. This demo is intended to be licensed under Apache-2.0.",
     category: "product",
     topic: "offline",
   },
 ];
 
 const SOURCES: [number, number, string][] = [
-  [1, 1, "MCP spec 2026-07-28"],
+  [1, 1, "MCP transport roadmap"],
   [2, 3, "WAL recovery notes"],
   [3, 5, "HNSW paper"],
   [4, 8, "RRF fusion note"],
@@ -143,7 +143,7 @@ function statements(): string[] {
   }
   sql.push(
     `MEMORY STORE 'license' VALUE 'User requires Apache-2.0 and no phone-home telemetry.' IMPORTANCE 0.95`,
-    `MEMORY STORE 'file' VALUE 'The working database file is named agent.db and stays on this origin.' IMPORTANCE 0.7`,
+    `MEMORY STORE 'storage' VALUE 'The working demo state is a JSON snapshot in this browser profile.' IMPORTANCE 0.7`,
     `MEMORY STORE 'vectors' VALUE 'Prefer exact vector order for SQL. Report HNSW recall separately.' IMPORTANCE 0.8`,
     `MEMORY STORE 'place' VALUE 'Built as an offline agent desk, not a cloud account.' IMPORTANCE 0.6`,
   );

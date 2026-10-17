@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Shell } from "@/components/openbase/shell";
-import { Btn, Field, Panel, fieldClass } from "@/components/openbase/ui";
-import { getEngine, useConsole } from "@/lib/openbase/store";
-import { splitMarks, sqlQuote } from "@/lib/openbase/text";
-import type { ExecResult } from "@/lib/openbase/types";
+import { Shell } from "@/components/agentdb/shell";
+import { Btn, Field, Panel, fieldClass } from "@/components/agentdb/ui";
+import { getEngine, useConsole } from "@/lib/agentdb/store";
+import { splitMarks, sqlQuote } from "@/lib/agentdb/text";
+import type { ExecResult } from "@/lib/agentdb/types";
 
 export const Route = createFileRoute("/search")({ component: Page });
 

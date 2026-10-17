@@ -6,8 +6,8 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "OpenBase" },
-      { name: "description", content: "Agent-native database. SQL, vectors, BM25, memory, and MCP in one local file." },
+      { title: "AgentDB Browser Demo" },
+      { name: "description", content: "A browser-based AgentDB prototype: SQL-like queries, vector search, full-text search, and agent memory." },
       { name: "theme-color", content: "#0B0F0C" },
     ],
     links: [

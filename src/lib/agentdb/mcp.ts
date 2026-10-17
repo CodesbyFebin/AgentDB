@@ -1,7 +1,8 @@
 import type { Engine } from "./engine.ts";
+import { canonicalJson, sha256, summarizeResult } from "./evidence.ts";
 import { nlToSql } from "./nl2sql.ts";
 import { sqlQuote } from "./text.ts";
-import { ENGINE_VERSION, PROTOCOL, type Role, type Val } from "./types.ts";
+import { ENGINE_VERSION, type Role, type Val } from "./types.ts";
 
 export type ToolSpec = {
   name: string;
@@ -24,11 +25,12 @@ export type ToolResponse = ToolOk | ToolNeed | ToolErr;
 const RANK: Record<Role, number> = { read: 0, write: 1, admin: 2 };
 
 export const TOOLS: ToolSpec[] = [
-  { name: "list_tables", category: "Schema", role: "read", description: "List tables in the open file.", params: [] },
+  { name: "list_tables", category: "Schema", role: "read", description: "List tables in the browser snapshot.", params: [] },
   { name: "describe_table", category: "Schema", role: "read", description: "Columns, indexes, and a few sample rows.", params: [{ name: "name", type: "string", help: "Table name" }] },
   { name: "list_indexes", category: "Schema", role: "read", description: "Every B+Tree, HNSW, and BM25 index.", params: [] },
   { name: "get_schema_ddl", category: "Schema", role: "read", description: "DDL for one table or the whole file.", params: [{ name: "name", type: "string", help: "Optional table" }] },
-  { name: "execute_sql", category: "Query", role: "read", description: "Run SQL. Writes still obey the session role.", params: [{ name: "sql", type: "string", required: true, help: "Statement" }] },
+  { name: "execute_query", category: "Query", role: "read", description: "Run a structured table query with filters, ordering, and a limit.", params: [{ name: "table", type: "string", required: true, help: "Table" }, { name: "columns", type: "string", help: "Comma-separated columns, default *" }, { name: "filter", type: "json", help: "Column equality filters" }, { name: "order_by", type: "string", help: "Column name, optionally DESC" }, { name: "limit", type: "number", help: "Maximum rows" }] },
+  { name: "execute_sql", category: "Query", role: "admin", description: "Run raw SQL for advanced use. Writes still obey the session role.", params: [{ name: "sql", type: "string", required: true, help: "Statement" }] },
   { name: "explain_query", category: "Query", role: "read", description: "Plan for a read statement.", params: [{ name: "sql", type: "string", required: true, help: "SELECT, HYBRID, or SHOW" }] },
   { name: "nl_to_sql", category: "Query", role: "read", description: "Map an intent to SQL. Ambiguous intents ask back.", params: [{ name: "question", type: "string", required: true, help: "Intent" }, { name: "choice", type: "string", help: "Follow-up SQL from InputRequired" }] },
   { name: "vector_search", category: "Vector", role: "read", description: "Nearest rows. Exact, or HNSW with recall vs exact.", params: [{ name: "query", type: "string", required: true, help: "Text to embed" }, { name: "table", type: "string", help: "Default docs" }, { name: "column", type: "string", help: "Default embedding" }, { name: "k", type: "number", help: "Default 5" }, { name: "mode", type: "string", help: "exact or hnsw" }] },
@@ -45,16 +47,25 @@ export const TOOLS: ToolSpec[] = [
   { name: "create_table", category: "Admin", role: "write", description: "Create a table from a column list.", params: [{ name: "sql", type: "string", required: true, help: "CREATE TABLE ..." }] },
   { name: "drop_table", category: "Admin", role: "admin", description: "Drop a table and its indexes.", params: [{ name: "name", type: "string", required: true, help: "Table" }] },
   { name: "create_index", category: "Admin", role: "write", description: "Create a btree, vector, or fts index.", params: [{ name: "sql", type: "string", required: true, help: "CREATE INDEX ..." }] },
-  { name: "drop_index", category: "Admin", role: "admin", description: "Drop an index.", params: [{ name: "name", type: "string", required: true, help: "Index" }] },
+  { name: "drop_index", category: "Admin", role: "write", description: "Drop an index.", params: [{ name: "name", type: "string", required: true, help: "Index" }] },
   { name: "insert", category: "Data", role: "write", description: "Insert one row from a JSON object of column values. Strings only; use execute_sql for embed().", params: [{ name: "table", type: "string", required: true, help: "Table" }, { name: "row", type: "json", required: true, help: "{\"col\":\"value\"}" }] },
   { name: "update", category: "Data", role: "write", description: "Update rows matching a SQL predicate.", params: [{ name: "sql", type: "string", required: true, help: "UPDATE ..." }] },
   { name: "delete", category: "Data", role: "write", description: "Delete rows matching a SQL statement.", params: [{ name: "sql", type: "string", required: true, help: "DELETE ..." }] },
   { name: "batch_insert", category: "Data", role: "write", description: "Run several INSERT statements.", params: [{ name: "sql", type: "string", required: true, help: "INSERT ...; INSERT ..." }] },
   { name: "export_csv", category: "Data", role: "read", description: "CSV for one table.", params: [{ name: "table", type: "string", required: true, help: "Table" }] },
-  { name: "table_stats", category: "Analytics", role: "read", description: "Row counts and index detail.", params: [] },
-  { name: "query_plan", category: "Analytics", role: "read", description: "Alias of explain_query.", params: [{ name: "sql", type: "string", required: true, help: "Statement" }] },
+  { name: "import_csv", category: "Data", role: "write", description: "Import CSV rows using the first row as column names.", params: [{ name: "table", type: "string", required: true, help: "Destination table" }, { name: "csv", type: "string", required: true, help: "CSV text with a header row" }] },
+  { name: "create_stream", category: "Streams", role: "write", description: "Create a CDC stream on a table.", params: [{ name: "name", type: "string", required: true, help: "Stream name" }, { name: "table", type: "string", required: true, help: "Source table" }] },
+  { name: "stream_read", category: "Streams", role: "read", description: "Read recent CDC events from a stream.", params: [{ name: "name", type: "string", required: true, help: "Stream name" }] },
+  { name: "drop_stream", category: "Streams", role: "admin", description: "Drop a CDC stream.", params: [{ name: "name", type: "string", required: true, help: "Stream name" }] },
+  { name: "evidence_append", category: "Evidence", role: "write", description: "Append a hash-chained receipt to the evidence ledger.", params: [{ name: "intent", type: "string", required: true, help: "Action intent" }, { name: "run_id", type: "string", help: "Optional run identifier" }, { name: "result_summary", type: "string", help: "Optional summary" }] },
+  { name: "evidence_query", category: "Evidence", role: "read", description: "Query receipts by run, session, or actor.", params: [{ name: "run_id", type: "string", help: "Run identifier" }, { name: "session_id", type: "string", help: "Session identifier" }, { name: "actor", type: "string", help: "Actor-chain member" }] },
+  { name: "evidence_verify", category: "Evidence", role: "read", description: "Verify the SHA-256 receipt chain.", params: [] },
+  { name: "evidence_explain", category: "Evidence", role: "read", description: "Explain a receipt or run from its recorded action and outcome.", params: [{ name: "receipt_id", type: "number", help: "Receipt number" }, { name: "run_id", type: "string", help: "Run identifier" }] },
+  { name: "evidence_replay", category: "Evidence", role: "read", description: "Return ordered recorded actions for a run; does not re-execute them.", params: [{ name: "run_id", type: "string", required: true, help: "Run identifier" }] },
   { name: "vacuum", category: "Analytics", role: "admin", description: "Rebuild indexes, drop expired memory, checkpoint.", params: [] },
-  { name: "integrity_check", category: "Analytics", role: "read", description: "Keys, dims, and dangling index ids.", params: [] },
+  { name: "integrity_check", category: "Analytics", role: "admin", description: "Keys, dims, dangling index ids, and evidence chain.", params: [] },
+  { name: "checkpoint", category: "Admin", role: "admin", description: "Force a WAL checkpoint.", params: [] },
+  { name: "stats", category: "Analytics", role: "read", description: "Table counts, index detail, and query cache hit rate.", params: [] },
   { name: "agent_context", category: "Agent", role: "read", description: "Schema, memories, and recent changes for a new turn.", params: [] },
   { name: "agent_session", category: "Agent", role: "write", description: "Read or set the memory session name.", params: [{ name: "session", type: "string", help: "Omit to read" }] },
   { name: "agent_tools_list", category: "Agent", role: "read", description: "The tool registry this server exposes.", params: [] },
@@ -63,19 +74,15 @@ export const TOOLS: ToolSpec[] = [
 export function discover(engine: Engine) {
   const view = engine.overview();
   return {
-    protocol: PROTOCOL,
-    stateless: true,
-    identity: { name: "openbase", version: ENGINE_VERSION, file: view.file },
-    versions: [PROTOCOL],
+    protocol: null,
+    transport: "in-browser-demo",
+    stateless: false,
+    identity: { name: "agentdb", version: ENGINE_VERSION, storage: "localStorage" },
     capabilities: {
-      tools: true,
-      resources: true,
-      prompts: true,
-      mrtr: true,
-      discovery: true,
+      toolRegistryPreview: true,
+      protocolCompliance: false,
     },
-    routing: { methodHeader: "Mcp-Method", nameHeader: "Mcp-Name" },
-    tools: TOOLS.length,
+    toolCount: TOOLS.length,
     role: view.role,
   };
 }
@@ -83,39 +90,64 @@ export function discover(engine: Engine) {
 export function resources(engine: Engine) {
   const view = engine.overview();
   return [
-    { uri: "openbase://schema", description: "Full DDL" },
-    ...view.tables.map((table) => ({ uri: `openbase://tables/${table.name}`, description: `${table.rows} rows` })),
-    ...view.indexes.map((index) => ({ uri: `openbase://indexes/${index.name}`, description: index.kind })),
-    { uri: "openbase://docs", description: "How an agent should use this file" },
+    { uri: "agentdb-demo://schema", description: "Full DDL preview" },
+    ...view.tables.map((table) => ({ uri: `agentdb-demo://tables/${table.name}`, description: `${table.rows} rows` })),
+    ...view.indexes.map((index) => ({ uri: `agentdb-demo://indexes/${index.name}`, description: index.kind })),
+    { uri: "agentdb-demo://docs", description: "How to use this browser demo" },
   ];
 }
 
 export function readResource(engine: Engine, uri: string): Val {
   const view = engine.overview();
-  if (uri === "openbase://schema") return view.tables.map((table) => table.ddl).join("\n\n");
-  if (uri === "openbase://docs") {
-    return "Call server/discover, then agent_context. Use hybrid_search or execute_sql. If a table name is ambiguous, expect InputRequiredResult and send the choice back. The file is local; do not assume a network.";
+  if (uri === "agentdb-demo://schema") return view.tables.map((table) => table.ddl).join("\n\n");
+  if (uri === "agentdb-demo://docs") {
+    return "This is an in-browser preview. Tool calls are local TypeScript function calls, not an MCP server transport.";
   }
-  const table = uri.match(/^openbase:\/\/tables\/([\w]+)$/);
+  const table = uri.match(/^agentdb-demo:\/\/tables\/([\w]+)$/);
   if (table) {
     const found = view.tables.find((item) => item.name === table[1]);
     if (!found) return { error: "unknown table" };
     return { ddl: found.ddl, sample: found.sample as unknown as Val };
   }
-  const index = uri.match(/^openbase:\/\/indexes\/([\w]+)$/);
+  const index = uri.match(/^agentdb-demo:\/\/indexes\/([\w]+)$/);
   if (index) return (view.indexes.find((item) => item.name === index[1]) as unknown as Val) ?? { error: "unknown index" };
   return { error: `unknown resource ${uri}` };
 }
 
 export function prompts() {
   return [
-    { name: "openbase:query", description: "Help me write a query for..." },
-    { name: "openbase:explain", description: "Explain this query plan..." },
-    { name: "openbase:optimize", description: "How can I optimize this schema for..." },
+    { name: "agentdb-demo:query", description: "Help me write a query for..." },
+    { name: "agentdb-demo:explain", description: "Explain this query plan..." },
+    { name: "agentdb-demo:optimize", description: "How can I optimize this schema for..." },
   ];
 }
 
 export function callTool(engine: Engine, name: string, args: Record<string, unknown>): ToolResponse {
+  const response = callToolInner(engine, name, args);
+  const result: Val = response.ok
+    ? response.inputRequired
+      ? { inputRequired: response.inputRequired }
+      : response.content ?? null
+    : { error: response.error };
+  const actorChain = Array.isArray(args.actor_chain)
+    ? args.actor_chain.filter((item): item is string => typeof item === "string")
+    : ["browser-user", `role:${engine.role}`];
+  engine.appendEvidence({
+    runId: str(args.run_id) || engine.session,
+    sessionId: engine.session,
+    actorChain,
+    intent: str(args.intent) || `Tool call ${name}`,
+    decision: { approved: response.ok, policy: response.ok ? "role-check:allowed" : "role-check:denied-or-error", latencyMs: response.ms },
+    action: canonicalJson({ tool: name, paramsSha256: sha256(canonicalJson(args)) }),
+    resultHash: sha256(canonicalJson(result)),
+    resultSummary: summarizeResult(result),
+    timestamp: new Date().toISOString(),
+    audienceExplanation: `${name} ${response.ok ? "completed" : "failed"}${response.ok && response.inputRequired ? " and requested clarification" : ""}.`,
+  });
+  return response;
+}
+
+function callToolInner(engine: Engine, name: string, args: Record<string, unknown>): ToolResponse {
   const started = typeof performance !== "undefined" ? performance.now() : Date.now();
   const finish = (content: Val): ToolOk => ({ ok: true, content, ms: elapsed(started) });
   const fail = (error: string): ToolErr => ({ ok: false, error, ms: elapsed(started) });
@@ -126,8 +158,11 @@ export function callTool(engine: Engine, name: string, args: Record<string, unkn
   try {
     switch (name) {
       case "list_tables":
-      case "table_stats":
         return finish(engine.exec("SHOW TABLES").rows as unknown as Val);
+      case "stats": {
+        const view = engine.overview();
+        return finish({ tables: view.tables.map((table) => ({ name: table.name, rows: table.rows, columns: table.columns })) as unknown as Val, indexes: view.indexes as unknown as Val, queries: view.queries, cacheHits: view.hits, cacheMisses: view.misses, cacheHitRate: view.hitRate });
+      }
       case "list_indexes":
         return finish(engine.exec("SHOW INDEXES").rows as unknown as Val);
       case "describe_table": {
@@ -162,8 +197,28 @@ export function callTool(engine: Engine, name: string, args: Record<string, unkn
         if (!result.ok) return fail(result.error ?? "sql failed");
         return finish({ columns: result.columns.map((col) => col.name), rows: result.rows as unknown as Val, affected: result.affected, message: result.message ?? "", plan: result.plan as unknown as Val });
       }
-      case "explain_query":
-      case "query_plan": {
+      case "execute_query": {
+        const table = identifier(str(args.table));
+        if (!table) return fail("table is required and must be a simple identifier");
+        const columns = str(args.columns) || "*";
+        if (columns !== "*" && !columns.split(",").every((item) => identifier(item.trim()))) return fail("columns must be simple identifiers");
+        const filter = asRecord(args.filter);
+        const predicates = Object.entries(filter).map(([key, value]) => {
+          const col = identifier(key);
+          if (!col) throw new Error(`invalid filter column ${key}`);
+          if (value === null) return `${col} IS NULL`;
+          return `${col} = ${typeof value === "number" || typeof value === "boolean" ? String(value) : sqlQuote(String(value))}`;
+        });
+        const order = str(args.order_by);
+        if (order && !/^[A-Za-z_][\w]*(?:\s+(?:ASC|DESC))?$/i.test(order)) return fail("order_by must be a column name with optional ASC or DESC");
+        const limit = num(args.limit);
+        if (limit != null && (!Number.isInteger(limit) || limit < 0 || limit > 500)) return fail("limit must be an integer from 0 to 500");
+        const sql = `SELECT ${columns} FROM ${table}${predicates.length ? ` WHERE ${predicates.join(" AND ")}` : ""}${order ? ` ORDER BY ${order}` : ""}${limit == null ? "" : ` LIMIT ${limit}`}`;
+        const result = engine.exec(sql);
+        if (!result.ok) return fail(result.error ?? "query failed");
+        return finish({ columns: result.columns.map((col) => col.name), rows: result.rows as unknown as Val, plan: result.plan as unknown as Val });
+      }
+      case "explain_query": {
         const sql = str(args.sql);
         if (!sql) return fail("sql is required");
         const result = engine.exec(`EXPLAIN ${sql}`);
@@ -291,6 +346,101 @@ export function callTool(engine: Engine, name: string, args: Record<string, unkn
         if (!result.ok) return fail(result.error ?? "export failed");
         return finish(toCsv(result.columns.map((col) => col.name), result.rows));
       }
+      case "import_csv": {
+        const table = identifier(str(args.table));
+        const csv = str(args.csv);
+        if (!table || !csv) return fail("table and csv are required");
+        const records = parseCsv(csv);
+        const headers = records.shift()?.map((item) => identifier(item.trim()));
+        if (!headers?.length || headers.some((item) => !item)) return fail("CSV must start with simple column names");
+        if (records.length > 10_000) return fail("CSV import is limited to 10,000 rows");
+        const begin = engine.exec("BEGIN");
+        if (!begin.ok) return fail(begin.error ?? "could not begin CSV import");
+        let inserted = 0;
+        for (const row of records) {
+          if (row.length !== headers.length) {
+            engine.exec("ROLLBACK");
+            return fail("CSV row has a different number of fields than the header");
+          }
+          const values = row.map((value) => sqlQuote(value));
+          const result = engine.exec(`INSERT INTO ${table} (${headers.join(", ")}) VALUES (${values.join(", ")})`);
+          if (!result.ok) {
+            engine.exec("ROLLBACK");
+            return fail(result.error ?? "CSV import failed");
+          }
+          inserted += result.affected;
+        }
+        const commit = engine.exec("COMMIT");
+        if (!commit.ok) return fail(commit.error ?? "CSV import could not commit");
+        return finish({ inserted });
+      }
+      case "create_stream": {
+        const name = identifier(str(args.name));
+        const table = identifier(str(args.table));
+        if (!name || !table) return fail("name and table must be simple identifiers");
+        const result = engine.exec(`CREATE STREAM ${name} ON ${table}`);
+        if (!result.ok) return fail(result.error ?? "stream creation failed");
+        return finish(result.message ?? "stream created");
+      }
+      case "stream_read": {
+        const name = identifier(str(args.name));
+        if (!name) return fail("name must be a simple identifier");
+        const result = engine.exec("SHOW EVENTS");
+        if (!result.ok) return fail(result.error ?? "stream read failed");
+        const rows = result.rows.filter((row) => row[1] === name);
+        return finish(rows as unknown as Val);
+      }
+      case "drop_stream": {
+        const name = identifier(str(args.name));
+        if (!name) return fail("name must be a simple identifier");
+        const result = engine.exec(`DROP STREAM ${name}`);
+        if (!result.ok) return fail(result.error ?? "stream drop failed");
+        return finish(result.message ?? "stream dropped");
+      }
+      case "evidence_append": {
+        const intent = str(args.intent);
+        if (!intent) return fail("intent is required");
+        const receipt = engine.appendEvidence({
+          runId: str(args.run_id) || engine.session,
+          sessionId: engine.session,
+          actorChain: ["browser-user", `role:${engine.role}`],
+          intent,
+          decision: { approved: true, policy: "explicit-evidence-append", latencyMs: 0 },
+          action: canonicalJson({ tool: "evidence_append", paramsSha256: sha256(canonicalJson(args)) }),
+          resultHash: sha256(canonicalJson(args.result_summary ?? "receipt appended")),
+          resultSummary: str(args.result_summary) || "Explicit evidence receipt appended.",
+          timestamp: new Date().toISOString(),
+          audienceExplanation: `Recorded the requested intent: ${intent}.`,
+        });
+        return finish(receipt as unknown as Val);
+      }
+      case "evidence_query": {
+        const runId = str(args.run_id);
+        const sessionId = str(args.session_id);
+        const actor = str(args.actor);
+        const receipts = engine.evidenceRows().filter((receipt) =>
+          (!runId || receipt.runId === runId) &&
+          (!sessionId || receipt.sessionId === sessionId) &&
+          (!actor || receipt.actorChain.includes(actor)),
+        );
+        return finish(receipts as unknown as Val);
+      }
+      case "evidence_verify":
+        return finish(engine.verifyEvidence() as unknown as Val);
+      case "evidence_explain": {
+        const receiptId = num(args.receipt_id);
+        const runId = str(args.run_id);
+        const receipts = engine.evidenceRows().filter((receipt) =>
+          (receiptId == null || receipt.receiptId === receiptId) && (!runId || receipt.runId === runId),
+        );
+        return finish(receipts.map((receipt) => ({ receipt_id: receipt.receiptId, run_id: receipt.runId, explanation: receipt.audienceExplanation, action: receipt.action, result: receipt.resultSummary })) as unknown as Val);
+      }
+      case "evidence_replay": {
+        const runId = str(args.run_id);
+        if (!runId) return fail("run_id is required");
+        const receipts = engine.evidenceRows().filter((receipt) => receipt.runId === runId);
+        return finish({ run_id: runId, mode: "read-only ledger reconstruction", executed: false, actions: receipts.map((receipt) => ({ receipt_id: receipt.receiptId, timestamp: receipt.timestamp, action: receipt.action, result_hash: receipt.resultHash, result_summary: receipt.resultSummary })) } as unknown as Val);
+      }
       case "vacuum": {
         const result = engine.exec("VACUUM");
         if (!result.ok) return fail(result.error ?? "vacuum failed");
@@ -299,7 +449,12 @@ export function callTool(engine: Engine, name: string, args: Record<string, unkn
       case "integrity_check": {
         const result = engine.exec("CHECK");
         if (!result.ok) return fail(result.error ?? "check failed");
-        return finish(result.rows as unknown as Val);
+        return finish({ database: result.rows as unknown as Val, evidence: engine.verifyEvidence() } as unknown as Val);
+      }
+      case "checkpoint": {
+        const result = engine.exec("CHECKPOINT");
+        if (!result.ok) return fail(result.error ?? "checkpoint failed");
+        return finish(result.message ?? "checkpoint");
       }
       case "agent_context": {
         const view = engine.overview();
@@ -347,6 +502,46 @@ function num(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
   return null;
+}
+
+function identifier(value: string): string | null {
+  return /^[A-Za-z_][\w]*$/.test(value) ? value : null;
+}
+
+function asRecord(value: unknown): Record<string, Val> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, Val>;
+}
+
+function parseCsv(input: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+    if (quoted) {
+      if (char === '"' && input[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (char === '"') quoted = false;
+      else field += char;
+    } else if (char === '"' && field.length === 0) quoted = true;
+    else if (char === ",") {
+      row.push(field);
+      field = "";
+    } else if (char === "\n" || char === "\r") {
+      if (char === "\r" && input[i + 1] === "\n") i++;
+      row.push(field);
+      if (row.some((cell) => cell !== "")) rows.push(row);
+      row = [];
+      field = "";
+    } else field += char;
+  }
+  if (quoted) throw new Error("CSV has an unclosed quoted field");
+  row.push(field);
+  if (row.some((cell) => cell !== "")) rows.push(row);
+  return rows;
 }
 
 function toCsv(columns: string[], rows: Val[][]): string {
