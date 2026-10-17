@@ -14,7 +14,6 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as SchemaRouteImport } from './routes/schema'
 import { Route as SearchRouteImport } from './routes/search'
-import { Route as SqlRouteImport } from './routes/sql'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as StreamsRouteImport } from './routes/streams'
 import { Route as VectorsRouteImport } from './routes/vectors'
@@ -44,11 +43,6 @@ const SearchRoute = SearchRouteImport.update({
   path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SqlRoute = SqlRouteImport.update({
-  id: '/sql',
-  path: '/sql',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const StatsRoute = StatsRouteImport.update({
   id: '/stats',
   path: '/stats',
@@ -71,7 +65,6 @@ export interface FileRoutesByFullPath {
   '/memory': typeof MemoryRoute
   '/schema': typeof SchemaRoute
   '/search': typeof SearchRoute
-  '/sql': typeof SqlRoute
   '/stats': typeof StatsRoute
   '/streams': typeof StreamsRoute
   '/vectors': typeof VectorsRoute
@@ -82,7 +75,6 @@ export interface FileRoutesByTo {
   '/memory': typeof MemoryRoute
   '/schema': typeof SchemaRoute
   '/search': typeof SearchRoute
-  '/sql': typeof SqlRoute
   '/stats': typeof StatsRoute
   '/streams': typeof StreamsRoute
   '/vectors': typeof VectorsRoute
@@ -94,7 +86,6 @@ export interface FileRoutesById {
   '/memory': typeof MemoryRoute
   '/schema': typeof SchemaRoute
   '/search': typeof SearchRoute
-  '/sql': typeof SqlRoute
   '/stats': typeof StatsRoute
   '/streams': typeof StreamsRoute
   '/vectors': typeof VectorsRoute
@@ -107,7 +98,6 @@ export interface FileRouteTypes {
     | '/memory'
     | '/schema'
     | '/search'
-    | '/sql'
     | '/stats'
     | '/streams'
     | '/vectors'
@@ -118,7 +108,6 @@ export interface FileRouteTypes {
     | '/memory'
     | '/schema'
     | '/search'
-    | '/sql'
     | '/stats'
     | '/streams'
     | '/vectors'
@@ -129,7 +118,6 @@ export interface FileRouteTypes {
     | '/memory'
     | '/schema'
     | '/search'
-    | '/sql'
     | '/stats'
     | '/streams'
     | '/vectors'
@@ -141,7 +129,6 @@ export interface RootRouteChildren {
   MemoryRoute: typeof MemoryRoute
   SchemaRoute: typeof SchemaRoute
   SearchRoute: typeof SearchRoute
-  SqlRoute: typeof SqlRoute
   StatsRoute: typeof StatsRoute
   StreamsRoute: typeof StreamsRoute
   VectorsRoute: typeof VectorsRoute
@@ -184,13 +171,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/sql': {
-      id: '/sql'
-      path: '/sql'
-      fullPath: '/sql'
-      preLoaderRoute: typeof SqlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/stats': {
       id: '/stats'
       path: '/stats'
@@ -221,7 +201,6 @@ const rootRouteChildren: RootRouteChildren = {
   MemoryRoute: MemoryRoute,
   SchemaRoute: SchemaRoute,
   SearchRoute: SearchRoute,
-  SqlRoute: SqlRoute,
   StatsRoute: StatsRoute,
   StreamsRoute: StreamsRoute,
   VectorsRoute: VectorsRoute,
