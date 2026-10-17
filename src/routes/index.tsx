@@ -1,165 +1,139 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { ResultGrid } from "@/components/agentdb/grid";
-import { Shell } from "@/components/agentdb/shell";
-import { Btn, fieldClass } from "@/components/agentdb/ui";
-import { nlToSql, type NlNeed } from "@/lib/agentdb/nl2sql";
-import { SAMPLES } from "@/lib/agentdb/seed";
-import { getEngine, runSql, useConsole } from "@/lib/agentdb/store";
+import { useEffect, useMemo, useState } from "react";
+import { Shell } from "@/components/openbase/shell";
+import { Btn, Panel, fieldClass } from "@/components/openbase/ui";
+import { getEngine, useConsole } from "@/lib/openbase/store";
+import { TURN_PROMPTS, runTurn, type Turn } from "@/lib/openbase/turn";
 
 export const Route = createFileRoute("/")({ component: Home });
+
+const OPENING = TURN_PROMPTS[0];
+let live: Turn | null = null;
 
 function Home() {
   return (
     <Shell>
-      <Workbench />
+      <Session />
     </Shell>
   );
 }
 
-function Workbench() {
+function Session() {
   const ready = useConsole((state) => state.ready);
-  const sql = useConsole((state) => state.sql);
-  const ask = useConsole((state) => state.ask);
-  const mode = useConsole((state) => state.mode);
-  const result = useConsole((state) => state.result);
-  const [explain, setExplain] = useState(false);
-  const [clarify, setClarify] = useState<NlNeed | null>(null);
-  const [note, setNote] = useState("");
+  const rev = useConsole((state) => state.rev);
+  const [question, setQuestion] = useState(OPENING);
+  const [turn, setTurn] = useState<Turn | null>(live);
 
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-        event.preventDefault();
-        submit();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-
-  function submit(text = mode === "sql" ? sql : ask) {
     if (!ready) return;
-    setClarify(null);
-    if (mode === "ask") {
-      const mapped = nlToSql(getEngine(), text);
-      if (mapped.kind === "need") {
-        setClarify(mapped);
-        setNote(mapped.message);
-        return;
-      }
-      setNote(`${mapped.note} ${Math.round(mapped.confidence * 100)}%`);
-      runSql(mapped.sql);
-      useConsole.setState({ sql: mapped.sql });
+    if (live) {
+      setTurn(live);
+      setQuestion(live.question);
       return;
     }
-    const rewritten = rewriteDot(text);
-    if (rewritten.help) {
-      setNote(rewritten.help);
-      return;
-    }
-    const statement = explain && !/^\s*explain\b/i.test(rewritten.sql) ? `EXPLAIN ${rewritten.sql}` : rewritten.sql;
-    runSql(statement);
+    play(OPENING);
+  }, [ready]);
+
+  function play(text: string, choice?: string) {
+    live = runTurn(getEngine(), text, choice);
+    setQuestion(text);
+    setTurn(live);
+    useConsole.setState((state) => ({ rev: state.rev + 1 }));
   }
+
+  const ledger = useMemo(() => {
+    if (!ready) return [];
+    const result = getEngine().exec("SELECT id, question, because FROM evidence_ledger ORDER BY id DESC LIMIT 6");
+    return result.ok ? result.rows : [];
+  }, [ready, rev]);
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-medium">Workbench</h1>
-          <p className="max-w-xl text-sm text-pretty text-muted">
-            Browser-based demo. SQL-like queries, exact vector search, BM25, and hybrid ranking run in this page; data is saved in this browser profile.
-          </p>
-        </div>
-        <div className="flex rounded-md border border-line p-1" role="group" aria-label="Editor mode">
-          {(["sql", "ask"] as const).map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => useConsole.setState({ mode: item })}
-              className={`min-h-11 rounded-md px-3 font-mono text-xs ${mode === item ? "bg-signal text-signal-ink" : "text-muted"}`}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
+      <div>
+        <h1 className="text-lg font-medium">Agent</h1>
+        <p className="max-w-2xl text-sm text-pretty text-muted">
+          A local tool router opens the file, calls MCP tools, and writes a because-line. No hosted model. Nothing leaves the browser.
+        </p>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {SAMPLES.map((sample) => (
+        {TURN_PROMPTS.map((prompt) => (
           <button
-            key={sample.label}
+            key={prompt}
             type="button"
-            className="min-h-11 shrink-0 rounded-md border border-line px-3 font-mono text-xs text-muted hover:text-fg"
+            className="min-h-11 shrink-0 rounded-md border border-line px-3 text-left text-xs text-muted hover:text-fg"
             onClick={() => {
-              useConsole.setState({ mode: "sql", sql: sample.sql });
-              if (ready) runSql(explain ? `EXPLAIN ${sample.sql}` : sample.sql);
+              setQuestion(prompt);
+              if (ready) play(prompt);
             }}
           >
-            {sample.label}
+            {prompt}
           </button>
         ))}
       </div>
       <label className="flex flex-col gap-2">
-        <span className="sr-only">{mode === "sql" ? "SQL" : "Question"}</span>
+        <span className="sr-only">Question for the agent</span>
         <textarea
-          className={`${fieldClass} min-h-44 font-mono leading-relaxed`}
-          value={mode === "sql" ? sql : ask}
-          spellCheck={mode === "ask"}
-          onChange={(event) => useConsole.setState(mode === "sql" ? { sql: event.target.value } : { ask: event.target.value })}
+          className={`${fieldClass} min-h-24`}
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
         />
       </label>
-      <div className="flex flex-wrap items-center gap-3">
-        <Btn tone="signal" disabled={!ready} onClick={() => submit()}>
-          {ready ? "Run" : "Opening file"}
+      <div>
+        <Btn tone="signal" disabled={!ready || !question.trim()} onClick={() => play(question)}>
+          {ready ? "Run turn" : "Opening file"}
         </Btn>
-        {mode === "sql" ? (
-          <label className="inline-flex min-h-11 items-center gap-2 text-sm text-muted">
-            <input type="checkbox" checked={explain} onChange={(event) => setExplain(event.target.checked)} />
-            Explain
-          </label>
-        ) : null}
-        <span className="font-mono text-xs text-muted">Ctrl+Enter</span>
-        {note ? <span className="text-sm text-muted">{note}</span> : null}
       </div>
-      {clarify ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-line bg-bg-raised p-4">
-          <p className="text-sm">{clarify.message}</p>
-          <div className="flex flex-wrap gap-2">
-            {clarify.options.map((option) => (
-              <Btn
-                key={option.label}
-                onClick={() => {
-                  getEngine().learn(ask, option.sql);
-                  useConsole.setState({ sql: option.sql, mode: "sql" });
-                  runSql(option.sql);
-                  setClarify(null);
-                  setNote("Pinned this intent to the pattern cache.");
-                }}
-              >
-                {option.label}
-              </Btn>
+      {!turn ? <p className="text-sm text-muted">Opening agent.db…</p> : <TurnView turn={turn} onChoice={(sql) => play(turn.question, sql)} />}
+      {ledger.length ? (
+        <Panel title="evidence_ledger">
+          <ul className="flex flex-col gap-3">
+            {ledger.map((row) => (
+              <li key={String(row[0])} className="border-t border-line pt-3 first:border-t-0 first:pt-0">
+                <p className="text-sm">{String(row[1])}</p>
+                <p className="mt-1 text-sm text-pretty text-muted">{String(row[2])}</p>
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </Panel>
       ) : null}
-      <ResultGrid result={ready ? result : null} />
     </div>
   );
 }
 
-function rewriteDot(sql: string): { sql: string; help?: string } {
-  const text = sql.trim();
-  if (text === ".help") {
-    return {
-      sql: text,
-      help: "Try .tables, .indexes, .schema docs, .streams, .events, or any SQL statement.",
-    };
-  }
-  if (text === ".tables") return { sql: "SHOW TABLES" };
-  if (text === ".indexes") return { sql: "SHOW INDEXES" };
-  if (text === ".streams") return { sql: "SHOW STREAMS" };
-  if (text === ".events") return { sql: "SHOW EVENTS" };
-  const schema = text.match(/^\.schema\s+([A-Za-z_][\w]*)$/);
-  if (schema) return { sql: `SHOW SCHEMA ${schema[1]}` };
-  return { sql };
+function TurnView({ turn, onChoice }: { turn: Turn; onChoice: (sql: string) => void }) {
+  const waiting = turn.steps.find((step) => step.inputRequired);
+  return (
+    <div className="flex flex-col gap-4">
+      <ol className="flex flex-col gap-2">
+        {turn.steps.map((step, index) => (
+          <li key={`${step.call}-${index}`} className="rounded-lg border border-line bg-bg-raised">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+              <span className="font-mono text-xs">
+                <span className="text-muted">{String(index + 1).padStart(2, "0")}</span> {step.call}
+              </span>
+              <span className="font-mono text-xs text-muted tabular-nums">{step.ok ? `${step.ms} ms` : "refused"}</span>
+            </div>
+            <p className="border-t border-line px-4 py-3 text-sm text-pretty text-muted">{step.summary}</p>
+          </li>
+        ))}
+      </ol>
+      {waiting?.inputRequired ? (
+        <Panel title="Input required">
+          <p className="text-sm">{waiting.inputRequired.message}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {waiting.inputRequired.options.map((option) => (
+              <Btn key={option.label} onClick={() => onChoice(option.value)}>
+                {option.label}
+              </Btn>
+            ))}
+          </div>
+        </Panel>
+      ) : (
+        <Panel title="Answer" aside={<span className="font-mono text-xs text-muted">because</span>}>
+          <p className="text-sm text-pretty">{turn.answer}</p>
+          <p className="mt-3 text-sm text-pretty text-muted">{turn.because}</p>
+        </Panel>
+      )}
+    </div>
+  );
 }

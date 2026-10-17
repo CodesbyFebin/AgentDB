@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Shell } from "@/components/agentdb/shell";
-import { Btn, Panel } from "@/components/agentdb/ui";
-import { getEngine, importFile, resetFile, runSql, useConsole } from "@/lib/agentdb/store";
-import type { Snapshot } from "@/lib/agentdb/types";
+import { Shell } from "@/components/openbase/shell";
+import { Btn, Panel } from "@/components/openbase/ui";
+import { getEngine, importFile, resetFile, runSql, useConsole } from "@/lib/openbase/store";
+import type { Snapshot } from "@/lib/openbase/types";
 
 export const Route = createFileRoute("/stats")({ component: Page });
 
@@ -32,13 +32,13 @@ function StatsView() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-lg font-medium">Browser snapshot</h1>
+        <h1 className="text-lg font-medium">File</h1>
         <p className="max-w-2xl text-sm text-pretty text-muted">
-          This demo stores a JSON snapshot in localStorage and replays a simulated operation log. It is not an OS-level database file or a crash-durable WAL.
+          Checkpoint plus WAL is the whole durability story. Replay rebuilds the open file from that pair and checks the counts.
         </p>
       </div>
       {!view ? (
-        <p className="text-sm text-muted">Opening browser snapshot…</p>
+        <p className="text-sm text-muted">Opening agent.db…</p>
       ) : (
         <>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -49,7 +49,7 @@ function StatsView() {
             <Stat label="Queries" value={String(view.queries)} />
             <Stat label="Memories" value={String(view.memories.length)} />
             <Stat label="Patterns" value={String(view.patterns)} />
-            <Stat label="Snapshot size" value={`${(view.bytes / 1024).toFixed(1)} kb`} />
+            <Stat label="File" value={`${(view.bytes / 1024).toFixed(1)} kb`} />
           </div>
           <Panel title="Rows by table">
             <div className="h-56 w-full">
@@ -100,7 +100,7 @@ function StatsView() {
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
                 link.href = url;
-                link.download = "agentdb-browser-snapshot.json";
+                link.download = "agent.db.json";
                 link.click();
                 URL.revokeObjectURL(url);
               }}
@@ -129,19 +129,19 @@ function StatsView() {
               onClick={() => {
                 if (!armed) {
                   setArmed(true);
-                  setNote("Press reset again to replace the browser snapshot with the seed data.");
+                  setNote("Press reset again to replace agent.db with the seed file.");
                   return;
                 }
                 resetFile();
                 setArmed(false);
-                setNote("Seed data restored.");
+                setNote("Seed file restored.");
               }}
             >
               {armed ? "Confirm reset" : "Reset file"}
             </Btn>
           </div>
           {note ? <p className="text-sm text-pretty">{note}</p> : null}
-          <Panel title="What this browser demo does">
+          <Panel title="What this file actually does">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <h2 className="text-sm font-medium">Running here</h2>
@@ -150,8 +150,9 @@ function StatsView() {
                   <li>Exact vector order and an HNSW index with measured recall</li>
                   <li>BM25 and reciprocal rank fusion</li>
                   <li>Memory with importance and decay</li>
-                  <li>34 MCP-shaped calls executed in the browser</li>
-                  <li>Simulated operation-log replay from a snapshot</li>
+                  <li>MCP tools, discovery, and input-required follow-ups</li>
+                  <li>An evidence ledger row with a because-line</li>
+                  <li>WAL replay from the last checkpoint</li>
                 </ul>
               </div>
               <div>
