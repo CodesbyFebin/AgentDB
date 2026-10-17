@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Shell } from "@/components/agentdb/shell";
-import { Btn, Field, Panel, fieldClass } from "@/components/agentdb/ui";
-import { getEngine, useConsole } from "@/lib/agentdb/store";
-import type { Metric, Val } from "@/lib/agentdb/types";
+import { Shell } from "@/components/openbase/shell";
+import { Btn, Field, Panel, fieldClass } from "@/components/openbase/ui";
+import { getEngine, useConsole } from "@/lib/openbase/store";
+import type { Metric, Val } from "@/lib/openbase/types";
 
 export const Route = createFileRoute("/vectors")({ component: Page });
 

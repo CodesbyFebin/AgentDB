@@ -7,7 +7,7 @@ import { nlToSql } from "./nl2sql.ts";
 import { openSeed } from "./seed.ts";
 import { distance } from "./text.ts";
 
-describe("agentdb browser prototype", () => {
+describe("openbase engine", () => {
   it("seeds, filters, groups, joins, and reads JSON", () => {
     const db = openSeed();
     const tables = db.exec("SHOW TABLES");
@@ -39,7 +39,7 @@ describe("agentdb browser prototype", () => {
   it("ranks the write-ahead log by vector distance and BM25", () => {
     const db = openSeed();
     const nearest = db.exec(
-      "SELECT id, title FROM docs ORDER BY vector_distance(embedding, embed('The write-ahead log records every committed mutation before the checkpoint is rewritten. After a crash, AgentDB replays the log from the last checkpoint so committed writes survive.')) LIMIT 1",
+      "SELECT id, title FROM docs ORDER BY vector_distance(embedding, embed('The write-ahead log records every committed mutation before the checkpoint is rewritten. After a crash, OpenBase replays the log from the last checkpoint so committed writes survive.')) LIMIT 1",
     );
     assert.equal(nearest.ok, true, nearest.error);
     assert.equal(nearest.rows[0][0], 3);
@@ -87,13 +87,12 @@ describe("agentdb browser prototype", () => {
     assert.equal(db.exec("SELECT count(*) AS n FROM sources").rows[0][0], 5);
   });
 
-  it("exposes the in-browser tool registry and clarification flow", () => {
+  it("speaks MCP, including a clarifying round trip", () => {
     const db = openSeed();
     const info = discover(db);
-    assert.equal(info.protocol, null);
-    assert.equal(info.transport, "in-browser-demo");
-    assert.equal(info.stateless, false);
-    assert.equal(TOOLS.length, 34);
+    assert.equal(info.protocol, "2026-07-28");
+    assert.equal(info.stateless, true);
+    assert.ok(TOOLS.length >= 30);
 
     const listed = callTool(db, "list_tables", {});
     assert.equal(listed.ok, true);

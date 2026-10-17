@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Shell } from "@/components/agentdb/shell";
-import { Btn, Field, Panel, fieldClass, formatCell } from "@/components/agentdb/ui";
-import { getEngine, runSql, useConsole } from "@/lib/agentdb/store";
+import { Shell } from "@/components/openbase/shell";
+import { Btn, Field, Panel, fieldClass, formatCell } from "@/components/openbase/ui";
+import { getEngine, runSql, useConsole } from "@/lib/openbase/store";
 
 export const Route = createFileRoute("/schema")({ component: Page });
 
@@ -54,10 +54,10 @@ function SchemaView() {
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="text-lg font-medium">Schema</h1>
-        <p className="text-sm text-muted">Tables, indexes, and the DDL preview for this browser demo.</p>
+        <p className="text-sm text-muted">Tables, indexes, and the DDL an agent would read from openbase://schema.</p>
       </div>
       {!view ? (
-        <p className="text-sm text-muted">Opening browser snapshot…</p>
+        <p className="text-sm text-muted">Opening agent.db…</p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
           <div className="flex flex-col gap-2">

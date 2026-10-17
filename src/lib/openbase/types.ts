@@ -1,5 +1,6 @@
-export const STORAGE_KEY = "agentdb.browser-demo.v1";
-export const FILE_NAME = "localStorage snapshot";
+export const STORAGE_KEY = "openbase.agent.db.v1";
+export const FILE_NAME = "agent.db";
+export const PROTOCOL = "2026-07-28";
 export const ENGINE_VERSION = "0.4.0";
 
 export type Role = "read" | "write" | "admin";

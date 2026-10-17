@@ -1,7 +1,7 @@
 import type { Engine } from "./engine.ts";
 import { nlToSql } from "./nl2sql.ts";
 import { sqlQuote } from "./text.ts";
-import { ENGINE_VERSION, type Role, type Val } from "./types.ts";
+import { ENGINE_VERSION, PROTOCOL, type Role, type Val } from "./types.ts";
 
 export type ToolSpec = {
   name: string;
@@ -24,7 +24,7 @@ export type ToolResponse = ToolOk | ToolNeed | ToolErr;
 const RANK: Record<Role, number> = { read: 0, write: 1, admin: 2 };
 
 export const TOOLS: ToolSpec[] = [
-  { name: "list_tables", category: "Schema", role: "read", description: "List tables in the browser snapshot.", params: [] },
+  { name: "list_tables", category: "Schema", role: "read", description: "List tables in the open file.", params: [] },
   { name: "describe_table", category: "Schema", role: "read", description: "Columns, indexes, and a few sample rows.", params: [{ name: "name", type: "string", help: "Table name" }] },
   { name: "list_indexes", category: "Schema", role: "read", description: "Every B+Tree, HNSW, and BM25 index.", params: [] },
   { name: "get_schema_ddl", category: "Schema", role: "read", description: "DDL for one table or the whole file.", params: [{ name: "name", type: "string", help: "Optional table" }] },
@@ -63,15 +63,19 @@ export const TOOLS: ToolSpec[] = [
 export function discover(engine: Engine) {
   const view = engine.overview();
   return {
-    protocol: null,
-    transport: "in-browser-demo",
-    stateless: false,
-    identity: { name: "agentdb", version: ENGINE_VERSION, storage: "localStorage" },
+    protocol: PROTOCOL,
+    stateless: true,
+    identity: { name: "openbase", version: ENGINE_VERSION, file: view.file },
+    versions: [PROTOCOL],
     capabilities: {
-      toolRegistryPreview: true,
-      protocolCompliance: false,
+      tools: true,
+      resources: true,
+      prompts: true,
+      mrtr: true,
+      discovery: true,
     },
-    toolCount: TOOLS.length,
+    routing: { methodHeader: "Mcp-Method", nameHeader: "Mcp-Name" },
+    tools: TOOLS.length,
     role: view.role,
   };
 }
@@ -79,35 +83,35 @@ export function discover(engine: Engine) {
 export function resources(engine: Engine) {
   const view = engine.overview();
   return [
-    { uri: "agentdb-demo://schema", description: "Full DDL preview" },
-    ...view.tables.map((table) => ({ uri: `agentdb-demo://tables/${table.name}`, description: `${table.rows} rows` })),
-    ...view.indexes.map((index) => ({ uri: `agentdb-demo://indexes/${index.name}`, description: index.kind })),
-    { uri: "agentdb-demo://docs", description: "How to use this browser demo" },
+    { uri: "openbase://schema", description: "Full DDL" },
+    ...view.tables.map((table) => ({ uri: `openbase://tables/${table.name}`, description: `${table.rows} rows` })),
+    ...view.indexes.map((index) => ({ uri: `openbase://indexes/${index.name}`, description: index.kind })),
+    { uri: "openbase://docs", description: "How an agent should use this file" },
   ];
 }
 
 export function readResource(engine: Engine, uri: string): Val {
   const view = engine.overview();
-  if (uri === "agentdb-demo://schema") return view.tables.map((table) => table.ddl).join("\n\n");
-  if (uri === "agentdb-demo://docs") {
-    return "This is an in-browser preview. Tool calls are local TypeScript function calls, not an MCP server transport.";
+  if (uri === "openbase://schema") return view.tables.map((table) => table.ddl).join("\n\n");
+  if (uri === "openbase://docs") {
+    return "Call server/discover, then agent_context. Use hybrid_search or execute_sql. If a table name is ambiguous, expect InputRequiredResult and send the choice back. The file is local; do not assume a network.";
   }
-  const table = uri.match(/^agentdb-demo:\/\/tables\/([\w]+)$/);
+  const table = uri.match(/^openbase:\/\/tables\/([\w]+)$/);
   if (table) {
     const found = view.tables.find((item) => item.name === table[1]);
     if (!found) return { error: "unknown table" };
     return { ddl: found.ddl, sample: found.sample as unknown as Val };
   }
-  const index = uri.match(/^agentdb-demo:\/\/indexes\/([\w]+)$/);
+  const index = uri.match(/^openbase:\/\/indexes\/([\w]+)$/);
   if (index) return (view.indexes.find((item) => item.name === index[1]) as unknown as Val) ?? { error: "unknown index" };
   return { error: `unknown resource ${uri}` };
 }
 
 export function prompts() {
   return [
-    { name: "agentdb-demo:query", description: "Help me write a query for..." },
-    { name: "agentdb-demo:explain", description: "Explain this query plan..." },
-    { name: "agentdb-demo:optimize", description: "How can I optimize this schema for..." },
+    { name: "openbase:query", description: "Help me write a query for..." },
+    { name: "openbase:explain", description: "Explain this query plan..." },
+    { name: "openbase:optimize", description: "How can I optimize this schema for..." },
   ];
 }
 

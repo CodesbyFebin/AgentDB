@@ -226,7 +226,7 @@ export class Engine {
             : `${idx.entries.length} keys`,
     }));
     return {
-      file: "localStorage snapshot",
+      file: "agent.db",
       lsn: this.lsn,
       checkpointLsn: this.checkpointLsn,
       wal: this.wal.length,

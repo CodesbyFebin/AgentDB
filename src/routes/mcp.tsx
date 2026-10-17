@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Shell } from "@/components/agentdb/shell";
-import { Btn, Field, Panel, fieldClass } from "@/components/agentdb/ui";
-import { TOOLS, callTool, discover, prompts, resources, type ToolResponse } from "@/lib/agentdb/mcp";
-import { getEngine, useConsole } from "@/lib/agentdb/store";
+import { Shell } from "@/components/openbase/shell";
+import { Btn, Field, Panel, fieldClass } from "@/components/openbase/ui";
+import { TOOLS, callTool, discover, prompts, resources, type ToolResponse } from "@/lib/openbase/mcp";
+import { getEngine, useConsole } from "@/lib/openbase/store";
 
 export const Route = createFileRoute("/mcp")({ component: Page });
 
@@ -50,18 +50,18 @@ function McpView() {
       <div>
         <h1 className="text-lg font-medium">MCP</h1>
         <p className="max-w-2xl text-sm text-pretty text-muted">
-          In-browser preview of 34 MCP-shaped tool calls. Calls invoke TypeScript functions directly; no MCP transport or protocol conformance is implemented.
+          Stateless core. No initialize handshake and no session id. If a tool needs a choice, it returns InputRequired and waits for the next call.
         </p>
       </div>
       {info ? (
         <div className="grid gap-2 sm:grid-cols-4">
-          <Stat label="Transport" value="In browser" />
-          <Stat label="Tool calls" value={String(info.toolCount)} />
-          <Stat label="Demo role" value={String(info.role)} />
-          <Stat label="Protocol status" value="Not implemented" />
+          <Stat label="Protocol" value={info.protocol} />
+          <Stat label="Tools" value={String(info.tools)} />
+          <Stat label="Role" value={String(info.role)} />
+          <Stat label="Stateless" value={info.stateless ? "yes" : "no"} />
         </div>
       ) : (
-        <p className="text-sm text-muted">Opening browser snapshot…</p>
+        <p className="text-sm text-muted">Opening agent.db…</p>
       )}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">

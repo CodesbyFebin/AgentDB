@@ -5,7 +5,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-/** Flat ESLint config for the AgentDB browser demo. */
+/** Flat ESLint config for the OpenBase browser console. */
 export default tseslint.config(
   {
     ignores: [
