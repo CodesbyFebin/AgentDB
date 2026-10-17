@@ -92,7 +92,7 @@ export class Engine {
   }
 
   appendEvidence(input: EvidenceInput): EvidenceReceipt {
-    const receipt = appendReceipt(this.evidence, input);
+    const receipt = appendReceipt(this.evidence, { ...input, actorChain: [...input.actorChain], decision: { ...input.decision } });
     this.persist();
     return { ...receipt, actorChain: [...receipt.actorChain], decision: { ...receipt.decision } };
   }

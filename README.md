@@ -20,7 +20,8 @@
 
 - No real MCP server transport: no stdio, HTTP, or 2026-07-28 conformance
 - The evidence ledger and deterministic receipt explanations are an early browser
-  prototype; policy evaluation and the full audit explanation system are not done
+  prototype; replay returns a read-only ledger reconstruction, and policy
+  evaluation and the full audit explanation system are not done
 - No operating-system database file; state is stored in browser `localStorage`
 - No server-side authorization or security boundary in the demo
 - Embeddings use a deterministic feature hash, not a neural model

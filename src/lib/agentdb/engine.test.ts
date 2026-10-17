@@ -125,6 +125,9 @@ describe("evidence ledger", () => {
     const query = db.exec("SELECT receipt_id, run_id FROM evidence_ledger WHERE run_id = 'ledger-test'");
     assert.equal(query.ok, true, query.error);
     assert.equal(query.rows.length, 10);
+    const reloaded = Engine.load(db.toSnapshot());
+    assert.deepEqual(reloaded.verifyEvidence(), { ok: true, count: 10 });
+    assert.equal(reloaded.exec("DELETE FROM evidence_ledger").ok, false);
   });
 
   it("detects a modified receipt after snapshot reload", () => {
