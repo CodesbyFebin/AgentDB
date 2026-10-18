@@ -58,7 +58,7 @@ function McpView() {
           <Stat label="Transport" value="In browser" />
           <Stat label="Tool calls" value={String(info.toolCount)} />
           <Stat label="Demo role" value={String(info.role)} />
-          <Stat label="Protocol status" value="Not implemented" />
+          <Stat label="HTTP protocol status" value="Partial" />
         </div>
       ) : (
         <p className="text-sm text-muted">Opening browser snapshot…</p>
