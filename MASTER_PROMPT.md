@@ -305,7 +305,7 @@ is a runtime error (AD-601).
 | `_meta` on every request (protocol version, client info, capabilities) | ✅ Phase 1 | |
 | `server/discover` implemented | ✅ Phase 1 | Returns: supported versions, capabilities, identity, tool list. |
 | MRTR (`InputRequiredResult` for clarification) | ✅ Phase 1 | Agent asks for disambiguation mid-execution. |
-| Routing headers (`Mcp-Method`, `Mcp-Name`) | ✅ Phase 1 | On HTTP transport. |
+| Routing headers (`Mcp-Method`, `Mcp-Name`) | ✅ Phase 1 slice | Validated on implemented HTTP methods. |
 | Transport: stdio (local) + Streamable HTTP (remote) | ✅ Phase 1 | `agentdb mcp --stdio` or `agentdb mcp --http :3000` |
 | OAuth 2.1 + OIDC | Phase 3 | For multi-tenant, remote deployment. |
 | Token passthrough FORBIDDEN | Phase 3 | Enforced when OAuth is added. |
@@ -578,7 +578,7 @@ agentdb lift app.py --schema mydata.db    # Ingress pipeline [Phase 3]
 
 ### Phase 0 — DONE (Browser Preview)
 - ✅ TypeScript browser preview with SQL-like queries, exact/HNSW vector search, BM25, hybrid ranking, memory, and CDC.
-- ✅ 34 in-browser tool-shaped calls; no real MCP transport or protocol conformance.
+- ✅ 34 in-browser tool-shaped calls; no HTTP, stdio, or protocol conformance in Phase 0.
 - ✅ Client-side read/write/admin role checks for demo interaction; not an authorization boundary.
 - ✅ `localStorage` JSON snapshot and simulated operation-log/checkpoint/replay flow; not an OS-level file or crash-durable WAL.
 - ✅ Deterministic feature-hash embeddings; not neural embeddings.
@@ -590,10 +590,14 @@ agentdb lift app.py --schema mydata.db    # Ingress pipeline [Phase 3]
 | Phase 0 | 34 | Browser prototype calls |
 | Phase 1 | 44 | Target MCP tool surface |
 
-**Current status:** The browser prototype now exposes the 44-name target
-registry and an initial append-only, SHA-256 hash-chained evidence ledger.
-These remain in-browser function calls. Real MCP transport, stateless request
-resumption, policy evaluation, and production audit explanations remain open.
+**Current status (2026-10-18):** The browser prototype exposes the 44-name
+registry and an append-only, SHA-256 hash-chained evidence ledger. A separate
+Node HTTP prototype now implements `server/discover`, `tools/list`, and
+`tools/call`, checks version and routing headers, and resumes a signed
+clarification token across two independent server instances. Tests cover those
+shapes and flows. This is a narrow transport slice; full MCP method coverage,
+stdio, policy evaluation, production authorization, and the complete audit
+explanation system remain open.
 
 **Entry criterion:** Phase 0 console working.
 **Exit criterion:** The 30-second demo (Section 9.1) works end-to-end.
@@ -603,15 +607,17 @@ a plain-English explanation. No human touches the SQL console.
 **Scope:**
 1. Complete the 44-tool target surface: the 5 evidence tools and the six other
    additions listed in the count note above. The browser prototype currently
-   implements them without MCP transport.
+   implements them in the browser, with the same 44-name registry exposed by
+   the initial Node HTTP prototype.
 2. Per-action intent evaluation (rule-based policy engine) replacing
    coarse RBAC as the primary authorization mechanism.
-3. Routing headers (`Mcp-Method`, `Mcp-Name`) on HTTP transport.
-4. `server/discover` exact-shape conformance test.
-5. MRTR statelessness test (cross-instance resumption).
+3. ✅ Initial HTTP routing headers (`Mcp-Method`, `Mcp-Name`) and protocol
+   version validation; broader method coverage remains open.
+4. ✅ `server/discover` response shape test for the 2026-07-28 schema.
+5. ✅ MRTR clarification resumption across independent server instances.
 6. Rebuild front page: MCP trace as default view.
 7. Explanation templates for all 44 tools (auditor + end user variants).
-8. The 30-second demo video.
+8. Record and review the 30-second demo video.
 
 **Kill criterion:** If the agent cannot complete the full loop without
 human intervention, the MCP surface is broken. Fix before proceeding.
