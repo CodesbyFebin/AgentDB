@@ -10,6 +10,8 @@
 - SQL-like queries, exact vector search, HNSW, BM25, and hybrid RRF ranking
 - Agent memory with store, recall, forget, importance, and decay
 - 44 browser tool calls, including an append-only SHA-256 evidence ledger
+- Agent Desk walkthrough: clarification pause, table search, read-role write
+  refusal, and a receipt-backed because-line; SQL remains in the developer nav
 - A Node HTTP prototype at `POST /mcp` with `server/discover`, `tools/list`, and
   `tools/call`, version/routing headers, and signed stateless clarification
 - Read/write/admin role switching for trying the demo; this is a UI control,
@@ -59,8 +61,9 @@ authorization boundary.
 npm test
 ```
 
-The Node test runner executes 13 engine, evidence, discovery-shape, header-routing,
-and cross-instance clarification tests across `src/lib/agentdb/*.test.ts`.
+The Node test runner executes 14 engine, evidence, agent-desk-flow,
+discovery-shape, header-routing, and cross-instance clarification tests across
+`src/lib/agentdb/*.test.ts`.
 
 The source also passes `npx tsc --noEmit`.
 
