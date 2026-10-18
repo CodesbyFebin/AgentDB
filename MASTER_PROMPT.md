@@ -615,7 +615,7 @@ a plain-English explanation. No human touches the SQL console.
    version validation; broader method coverage remains open.
 4. ✅ `server/discover` response shape test for the 2026-07-28 schema.
 5. ✅ MRTR clarification resumption across independent server instances.
-6. Rebuild front page: MCP trace as default view.
+6. ✅ Agent Desk is the front page; SQL is in the developer navigation.
 7. Explanation templates for all 44 tools (auditor + end user variants).
 8. Record and review the 30-second demo video.
 
