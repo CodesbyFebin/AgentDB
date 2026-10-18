@@ -5,7 +5,8 @@ import { boot, getEngine, setRole, useConsole } from "@/lib/agentdb/store";
 import type { Role } from "@/lib/agentdb/types";
 
 const NAV = [
-  { to: "/", label: "SQL", icon: Terminal },
+  { to: "/", label: "Agent Desk", icon: Brain },
+  { to: "/sql", label: "SQL", icon: Terminal },
   { to: "/schema", label: "Schema", icon: TableProperties },
   { to: "/vectors", label: "Vectors", icon: Waypoints },
   { to: "/search", label: "Search", icon: Search },
