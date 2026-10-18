@@ -33,7 +33,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <Mark />
           <span>
             <span className="block font-mono text-sm font-medium tracking-widest">AGENTDB</span>
-            <span className="block text-xs text-muted">Browser prototype · Phase 0</span>
+            <span className="block text-xs text-muted">Browser prototype · Phase 1 slice</span>
           </span>
         </Link>
         <RoleSwitch role={view?.role ?? "admin"} disabled={!ready} />
@@ -65,7 +65,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <span className="tabular-nums">LSN {String(view?.lsn ?? 0).padStart(4, "0")}</span>
             <span className="tabular-nums">WAL {view?.wal ?? 0}</span>
             <span>44 in-browser tool calls</span>
-            <span>localStorage · no database transport</span>
+            <span>browser-local calls · separate HTTP prototype</span>
             {view ? <span className="tabular-nums">{(view.bytes / 1024).toFixed(1)} kb</span> : null}
           </footer>
         </div>
