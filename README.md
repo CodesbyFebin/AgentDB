@@ -9,8 +9,9 @@
 
 - SQL-like queries, exact vector search, HNSW, BM25, and hybrid RRF ranking
 - Agent memory with store, recall, forget, importance, and decay
-- 44 MCP-shaped tool calls executed as in-browser TypeScript functions, including
-  an append-only SHA-256 evidence ledger
+- 44 browser tool calls, including an append-only SHA-256 evidence ledger
+- A Node HTTP prototype at `POST /mcp` with `server/discover`, `tools/list`, and
+  `tools/call`, version/routing headers, and signed stateless clarification
 - Read/write/admin role switching for trying the demo; this is a UI control,
   not an authorization boundary
 - Simulated operation log, JSON snapshot, checkpoint, and replay
@@ -18,7 +19,9 @@
 
 ## What Does Not Work Yet
 
-- No real MCP server transport: no stdio, HTTP, or 2026-07-28 conformance
+- The HTTP implementation covers discovery, tool listing/calls, routing headers,
+  and cross-instance clarification; other MCP methods, stdio, authorization, and
+  full protocol conformance remain unfinished
 - The evidence ledger and deterministic receipt explanations are an early browser
   prototype; replay returns a read-only ledger reconstruction, and policy
   evaluation and the full audit explanation system are not done
@@ -39,20 +42,30 @@ npm run dev
 Open the local development URL printed by Vite. The application works in the
 browser and does not require a database service.
 
+To run the separate HTTP transport prototype, set a secret of at least 32
+characters and start the seeded in-memory server:
+
+```bash
+AGENTDB_REQUEST_STATE_SECRET='replace-with-a-long-random-secret' npm run start:http
+```
+
+It listens on `http://127.0.0.1:3000/mcp` by default. The server currently seeds
+an in-memory demo engine at startup; it is not persistent storage or an
+authorization boundary.
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-The engine suite uses Node's built-in test runner and currently contains eight
-tests. `npm test` runs `src/lib/agentdb/engine.test.ts`.
+The Node test runner executes 13 engine, evidence, discovery-shape, header-routing,
+and cross-instance clarification tests across `src/lib/agentdb/*.test.ts`.
 
 The source also passes `npx tsc --noEmit`.
 
 ## Roadmap
 
 See [MASTER_PROMPT.md](./MASTER_PROMPT.md) for the target architecture and
-phased roadmap. The browser prototype is Phase 0 plus an initial Phase 1 ledger
-slice. Phase 1 still targets a real MCP transport, policy evaluation, and the
-complete plain-English explanation system.
+phased roadmap. Phase 1 still targets full MCP transport coverage, policy
+evaluation, and the complete plain-English explanation system.
