@@ -63,7 +63,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <span>{ready ? "localStorage snapshot" : "opening browser snapshot"}</span>
             <span className="tabular-nums">LSN {String(view?.lsn ?? 0).padStart(4, "0")}</span>
             <span className="tabular-nums">WAL {view?.wal ?? 0}</span>
-            <span>34 in-browser tool calls</span>
+            <span>44 in-browser tool calls</span>
             <span>localStorage · no database transport</span>
             {view ? <span className="tabular-nums">{(view.bytes / 1024).toFixed(1)} kb</span> : null}
           </footer>
