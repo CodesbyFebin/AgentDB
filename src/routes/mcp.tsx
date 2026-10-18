@@ -50,7 +50,7 @@ function McpView() {
       <div>
         <h1 className="text-lg font-medium">MCP</h1>
         <p className="max-w-2xl text-sm text-pretty text-muted">
-          In-browser preview of 34 MCP-shaped tool calls. Calls invoke TypeScript functions directly; no MCP transport or protocol conformance is implemented.
+          Preview the 44 browser tool calls. This page invokes TypeScript functions directly; a separate HTTP prototype supports discovery, tool listing, tool calls, and stateless clarification.
         </p>
       </div>
       {info ? (
