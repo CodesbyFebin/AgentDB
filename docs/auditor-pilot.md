@@ -21,9 +21,10 @@ recruitment, prepare two inspectable views for each scenario:
 2. The auditor explanation with its because-clause and links/IDs resolving to
    the same `evidence_ledger` receipts.
 
-The current browser prototype has generic per-tool explanation text and no
-real MCP transport. Label the pilot material as a prototype. Do not imply that
-it evaluates HTTP routing, transport conformance, or production authorization.
+The current browser prototype has generic per-tool explanation text. A separate
+HTTP prototype implements discovery, tool listing/calls, routing headers, and
+cross-instance clarification only. Label pilot material as a prototype. Do not
+imply that it evaluates full protocol conformance or production authorization.
 
 ## Pilot sample and session
 
